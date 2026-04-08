@@ -31,10 +31,10 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* 全体のスクロールを無効化（1画面に収めるため） */
+    /* スマホで自然にスクロールさせるため、余計な固定を排除 */
     body {
-      overflow: hidden;
-      touch-action: none; /* スマホでのスワイプスクロール防止 */
+      background-color: #020617; /* bg-slate-950 */
+      overflow-x: hidden;
     }
     
     /* カスタムスクロールバー（内部のログ等用） */
@@ -44,8 +44,8 @@
     ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.8); }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-sans antialiased h-screen w-screen">
-  <div id="root" class="h-full w-full"></div>
+<body class="text-slate-200 font-sans antialiased">
+  <div id="root" class="w-full min-h-screen"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
@@ -54,12 +54,12 @@
     const MAX_TURNS = 24;
 
     const STOCKS = {
-      IT: { name: 'ITメガベンチャー', icon: '💻' },
-      FOOD: { name: '安定食品メーカー', icon: '🍞' },
-      EXPORT: { name: 'グローバル自動車', icon: '🚗' }
+      IT: { name: 'ITメガベンチャー', icon: '💻', desc: 'ハイリスク・ハイリターン。金利の動きにとても敏感で、金利が下がると成長期待から大きく上がりやすい特徴があります。' },
+      FOOD: { name: '安定食品メーカー', icon: '🍞', desc: 'ローリスク・ローリターン。人が毎日食べるものなので、好景気でも不景気でも株価の変動が少なく安定しています。' },
+      EXPORT: { name: 'グローバル自動車', icon: '🚗', desc: 'ミドルリスク。海外でモノを売っているため、為替（円安・円高）の影響を大きく受けます。円安になると利益が増えて株価が上がりやすくなります。' }
     };
 
-    // 19マスのイベント定義（期待値プラスに調整、7,2,12は1つ、他は2つ）
+    // 19マスのイベント定義
     const BOARD_SQUARES = [
       { id: 0, dice: 7, type: 'NEWS_MACRO_BOOM', label: '好景気', icon: '📈', color: 'bg-rose-500/20 border-rose-400 text-rose-100', explanation: '出目7は一番確率が高い！景気回復により市場全体の株価が大きく上がりやすくなります。' },
       { id: 1, dice: 2, type: 'TAX', label: '税金', icon: '💸', color: 'bg-red-500/20 border-red-500 text-red-200', explanation: '出目2は滅多に出ませんが、投資の利益や資産には税金がかかります。15万円を支払います。' },
@@ -82,7 +82,6 @@
       { id: 18, dice: 11, type: 'SUBSIDY_FOOD', label: '農業支援', icon: '🍞', color: 'bg-teal-500/20 border-teal-400 text-teal-100', explanation: '政府からの食品産業支援！10万円を獲得し、さらに食品株も上がります。' },
     ];
 
-    // カタン風19マスの完全敷き詰め座標（3, 4, 5, 4, 3）
     const HEX_GRID = [
       {r: 0, c: 0, offset: 1}, {r: 0, c: 1, offset: 1}, {r: 0, c: 2, offset: 1},
       {r: 1, c: 0, offset: 0.5}, {r: 1, c: 1, offset: 0.5}, {r: 1, c: 2, offset: 0.5}, {r: 1, c: 3, offset: 0.5},
@@ -94,8 +93,8 @@
     const getHexStyle = (index, currentDice) => {
       const hex = HEX_GRID[index];
       const sq = BOARD_SQUARES[index];
-      const w = 19; // パネルの幅(%)
-      const h = w * 1.154; // パネルの高さ(%)
+      const w = 19; 
+      const h = w * 1.154; 
       const leftOffset = 2.5;
       const topOffset = 2;
       
@@ -126,13 +125,17 @@
       const [logs, setLogs] = useState([{ turn: 0, msg: 'ゲームスタート！まずは株を買ってみましょう。', type: 'info' }]);
       const [diceResult, setDiceResult] = useState(null);
       const [selectedSquare, setSelectedSquare] = useState(null);
+      const [selectedStockKey, setSelectedStockKey] = useState(null);
       
-      const logContainerRef = useRef(null);
+      const logContainerRefPC = useRef(null);
+      const logContainerRefMobile = useRef(null);
 
-      // ログが追加された時のみ、ログコンテナ内をスクロール
       useEffect(() => {
-        if (logContainerRef.current) {
-          logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+        if (logContainerRefPC.current) {
+          logContainerRefPC.current.scrollTop = logContainerRefPC.current.scrollHeight;
+        }
+        if (logContainerRefMobile.current) {
+          logContainerRefMobile.current.scrollTop = logContainerRefMobile.current.scrollHeight;
         }
       }, [logs]);
 
@@ -264,7 +267,6 @@
 
         addLog(`🎲 サイコロで「${d1}」と「${d2}」（合計：${total}）が出ました！`);
 
-        // 合計値と一致するマスをすべて発動（2個ある目なら両方発動！）
         const triggeredSquares = BOARD_SQUARES.filter(sq => sq.dice === total);
         
         if (triggeredSquares.length > 0) {
@@ -273,7 +275,6 @@
           });
         }
 
-        // 自然変動
         let baseTrend = 1.0;
         if (economy === 'BOOM') baseTrend = 1.02;
         if (economy === 'RECESSION') baseTrend = 0.98;
@@ -285,7 +286,7 @@
 
         if (turn >= MAX_TURNS) {
           setTimeout(() => setGameState('END'), 1500);
-          addLog('🏁 24ターンが終了しました！ゲームクリアです！', 'info');
+          addLog('🏁 24ターンが終了しました！投資期間完了です！', 'info');
         } else {
           setTurn(prev => prev + 1);
         }
@@ -315,13 +316,172 @@
         return { title: '😭 破産寸前...（やり直そう）', color: 'text-red-500' };
       };
 
+      // --- 各パネルのコンポーネント化（PC/スマホで再利用するため） ---
+
+      const renderStatusPanel = () => (
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-4 md:p-3 rounded-xl shadow-xl shrink-0 relative overflow-hidden z-10">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+          <h2 className="text-sm md:text-xs font-bold mb-2 text-slate-400 flex justify-between items-center">
+            <span className="bg-slate-800 px-3 py-1 rounded-full font-display tracking-wider">Turn {turn}/{MAX_TURNS}</span>
+            <span className={`px-3 py-1 rounded-full border text-xs md:text-[10px] tracking-wide ${economy === 'BOOM' ? 'bg-rose-500/20 border-rose-500/50 text-rose-300' : economy === 'RECESSION' ? 'bg-sky-500/20 border-sky-500/50 text-sky-300' : 'bg-slate-800 border-slate-600 text-slate-300'}`}>
+              景気: {economy === 'BOOM' ? '好景気📈' : economy === 'RECESSION' ? '不景気📉' : '平常➖'}
+            </span>
+          </h2>
+          <div className="text-4xl md:text-3xl font-display font-black text-white mb-2 md:mb-1 tracking-tight">
+            ¥{totalAssets.toLocaleString()}
+          </div>
+          <div className="text-slate-400 text-sm md:text-xs font-medium flex items-center gap-2">
+            <span className="font-display">CASH:</span> ¥{cash.toLocaleString()}
+          </div>
+        </div>
+      );
+
+      const renderMarketPanel = () => (
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-4 md:p-3 rounded-xl shadow-xl shrink-0 z-10">
+          <div className="flex justify-between items-center mb-3 md:mb-2">
+            <h2 className="text-sm md:text-[10px] font-display font-bold text-slate-500 uppercase tracking-widest">Market</h2>
+            <span className="text-[10px] md:text-[9px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded">※銘柄名タップで詳細</span>
+          </div>
+          <div className="space-y-3 md:space-y-2">
+            {Object.keys(STOCKS).map(key => (
+              <div key={key} className="p-3 md:p-2 border border-slate-700 bg-slate-800/50 rounded-lg transition-colors hover:bg-slate-800">
+                <div className="flex justify-between items-center mb-2 md:mb-1">
+                  <div 
+                    className="font-bold text-slate-200 text-sm md:text-xs cursor-pointer hover:text-blue-300 transition-colors flex items-center gap-2 md:gap-1 group"
+                    onClick={() => setSelectedStockKey(key)}
+                  >
+                    {STOCKS[key].icon} {STOCKS[key].name} 
+                    <span className="text-[10px] md:text-[9px] bg-slate-700 px-1.5 md:px-1 rounded text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">?</span>
+                  </div>
+                  <div className="text-lg md:text-sm font-display font-bold text-white">¥{prices[key].toLocaleString()}</div>
+                </div>
+                <div className="flex items-center justify-between mt-3 md:mt-2 pt-3 md:pt-2 border-t border-slate-700/50">
+                  <div className="text-xs md:text-[11px] font-medium text-slate-400">
+                    保有: <span className={holdings[key] > 0 ? 'text-blue-400 font-display font-bold text-base md:text-sm' : 'font-display text-base md:text-sm'}>{holdings[key]}</span>
+                  </div>
+                  <div className="flex gap-2 md:gap-1.5">
+                    <button 
+                      onClick={() => handleTrade(key, false)}
+                      disabled={holdings[key] < 100 || gameState !== 'PLAYING'}
+                      className="px-4 md:px-3 py-1.5 md:py-1 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-md hover:bg-rose-500/20 disabled:opacity-30 transition-all text-sm md:text-xs font-bold"
+                    >
+                      売る
+                    </button>
+                    <button 
+                      onClick={() => handleTrade(key, true)}
+                      disabled={cash < prices[key] * 100 || gameState !== 'PLAYING'}
+                      className="px-4 md:px-3 py-1.5 md:py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-md hover:bg-blue-500/20 disabled:opacity-30 transition-all text-sm md:text-xs font-bold"
+                    >
+                      買う
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      const renderLogPanel = (ref) => (
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-4 md:p-3 rounded-xl shadow-xl flex flex-col relative min-h-[220px] md:flex-1 md:min-h-[100px] z-10">
+          <h2 className="text-sm md:text-[10px] font-display font-bold text-slate-500 uppercase tracking-widest mb-3 md:mb-2 shrink-0">Event Log</h2>
+          <div 
+            ref={ref} 
+            className="overflow-y-auto flex-1 space-y-2 pr-2 text-sm md:text-xs leading-relaxed pb-4"
+          >
+            {logs.map((log, i) => (
+              <div key={i} className={`border-l-[3px] pl-3 py-2 md:py-1.5 rounded-r-md ${
+                log.type === 'good' ? 'border-emerald-500 text-emerald-100 bg-emerald-500/5' :
+                log.type === 'bad' ? 'border-rose-500 text-rose-100 bg-rose-500/5' :
+                log.type === 'trade' ? 'border-blue-500 text-blue-100 bg-blue-500/5' :
+                'border-slate-500 text-slate-200 bg-slate-500/5'
+              }`}>
+                {log.turn > 0 && <span className="opacity-50 mr-2 md:mr-1.5 text-[11px] md:text-[10px] font-display font-bold">[{log.turn}M]</span>}
+                {log.msg}
+              </div>
+            ))}
+          </div>
+          <div className="absolute bottom-2 left-3 right-4 h-6 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none rounded-b-xl"></div>
+        </div>
+      );
+
+      const renderBoardPanel = () => (
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-2 md:p-4 rounded-xl shadow-xl flex-1 flex flex-col min-h-0 relative z-10">
+          <div className="flex justify-between items-center mb-2 px-2 shrink-0">
+            <h2 className="text-sm md:text-xs font-display font-bold text-slate-500 uppercase tracking-widest">World Board</h2>
+            <span className="text-[10px] md:text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full shadow-sm animate-pulse tracking-wide">
+              💡 マスをタップで解説
+            </span>
+          </div>
+
+          <div className="flex-1 w-full relative aspect-square md:aspect-auto">
+            <div className="absolute inset-0 w-[98%] h-[98%] md:w-[95%] md:h-[95%] max-w-[800px] m-auto">
+              {BOARD_SQUARES.map((sq, i) => {
+                const style = getHexStyle(i, diceResult?.total);
+                const isActive = diceResult?.total === sq.dice;
+                return (
+                  <div 
+                    key={sq.id}
+                    style={style}
+                    onClick={() => setSelectedSquare(sq)}
+                    className={`cursor-pointer group flex items-center justify-center shadow-lg border-[1.5px] ${sq.color} hover:bg-opacity-40 backdrop-blur-md`}
+                  >
+                    <div className={`absolute top-[12%] left-1/2 transform -translate-x-1/2 w-[22%] aspect-square rounded-full flex items-center justify-center font-display font-black text-[clamp(10px,2vw,14px)] md:text-[clamp(10px,1.5vw,14px)] shadow-md border z-10 ${sq.dice === 6 || sq.dice === 8 ? 'bg-red-50 text-red-600 border-red-300' : 'bg-slate-50 text-slate-800 border-slate-300'}`}>
+                      {sq.dice}
+                    </div>
+                    <div className="flex flex-col items-center justify-center h-full w-full pt-3 md:pt-2 p-1 text-center pointer-events-none">
+                      <span className="text-3xl md:text-3xl drop-shadow-md mb-0.5">{sq.icon}</span>
+                      <span className="text-[9px] md:text-[10px] font-bold leading-tight drop-shadow-sm text-white px-0.5">
+                        {sq.label}
+                      </span>
+                    </div>
+                    {isActive && (
+                      <div 
+                        className="absolute inset-[-2px] border-[3px] border-white opacity-90 animate-ping pointer-events-none"
+                        style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
+                      ></div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+
+      const renderDicePanel = () => (
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-4 rounded-xl shadow-xl shrink-0 flex flex-col md:flex-row items-center justify-between gap-4 relative z-20">
+          <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
+            <div className="flex gap-2">
+              <div className="w-16 h-16 md:w-14 md:h-14 bg-slate-800 border-2 border-slate-600 rounded-xl flex items-center justify-center text-3xl md:text-2xl font-display font-black text-white shadow-inner">
+                {diceResult ? diceResult.d1 : '?'}
+              </div>
+              <div className="w-16 h-16 md:w-14 md:h-14 bg-slate-800 border-2 border-slate-600 rounded-xl flex items-center justify-center text-3xl md:text-2xl font-display font-black text-white shadow-inner">
+                {diceResult ? diceResult.d2 : '?'}
+              </div>
+            </div>
+            <div className="text-sm md:text-xs text-slate-400 leading-relaxed hidden lg:block font-medium">
+              株の売買が終わったら<br/>サイコロを振ってイベントを発生！
+            </div>
+          </div>
+          <button 
+            onClick={rollDice}
+            disabled={gameState !== 'PLAYING'}
+            className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-display font-bold py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_30px_rgba(79,70,229,0.5)] transform transition hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-2xl md:text-xl tracking-widest flex justify-center items-center gap-3"
+          >
+            <span className="text-3xl md:text-2xl">🎲</span> ROLL
+          </button>
+        </div>
+      );
+
+
       if (gameState === 'START') {
         return (
-          <div className="h-full w-full flex flex-col items-center justify-center p-4 relative overflow-y-auto">
-            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/20 blur-[120px] pointer-events-none"></div>
-            <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none"></div>
+          <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-y-auto">
+            <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/20 blur-[120px] pointer-events-none"></div>
+            <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none"></div>
             
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 p-6 md:p-10 rounded-3xl shadow-2xl max-w-xl w-full text-center z-10">
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 p-6 md:p-10 rounded-3xl shadow-2xl max-w-xl w-full text-center z-10 my-8">
               <h1 className="text-4xl md:text-5xl font-display font-black mb-3 bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent drop-shadow-sm tracking-tight">
                 Invest Quest
               </h1>
@@ -329,11 +489,11 @@
               
               <div className="text-left bg-slate-800/50 border border-slate-700/50 p-5 rounded-2xl mb-8 text-sm leading-relaxed text-slate-300">
                 <h2 className="font-bold mb-3 text-white flex items-center gap-2"><span className="text-lg">📜</span> ルール説明</h2>
-                <ul className="space-y-2">
-                  <li className="flex gap-2"><span className="text-blue-400">■</span> 初期資金100万円で「IT」「食品」「自動車」の株を売買します。</li>
-                  <li className="flex gap-2"><span className="text-blue-400">■</span> さいころ（2つ）を振ると、**出た目と同じ数字が書かれたマスのイベントがすべて発生**します。</li>
-                  <li className="flex gap-2"><span className="text-blue-400">■</span> マスをクリックすると、そのイベントの経済的な意味が学べます。</li>
-                  <li className="flex gap-2"><span className="text-blue-400">■</span> 24ヶ月後の総資産額で、あなたの投資家ランクが決まります。</li>
+                <ul className="space-y-3">
+                  <li className="flex gap-2"><span className="text-blue-400 mt-0.5">■</span> 初期資金100万円で「IT」「食品」「自動車」の株を売買します。</li>
+                  <li className="flex gap-2"><span className="text-blue-400 mt-0.5">■</span> さいころ（2つ）を振ると、**出た目と同じ数字が書かれたマスのイベントがすべて発生**します。</li>
+                  <li className="flex gap-2"><span className="text-blue-400 mt-0.5">■</span> マスをクリックすると、そのイベントの経済的な意味が学べます。</li>
+                  <li className="flex gap-2"><span className="text-blue-400 mt-0.5">■</span> 24ヶ月後の総資産額で、あなたの投資家ランクが決まります。</li>
                 </ul>
               </div>
               
@@ -350,171 +510,39 @@
       }
 
       return (
-        <div className="h-full w-full flex flex-col md:flex-row p-2 md:p-4 gap-3 relative">
+        <div className="w-full relative min-h-screen">
           
-          <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none fixed">
+          {/* 背景装飾（固定） */}
+          <div className="fixed top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/10 blur-[100px]"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-600/10 blur-[100px]"></div>
           </div>
 
-          {/* 左パネル (ステータス・売買・ログ) */}
-          <div className="w-full md:w-[35%] flex flex-col gap-3 z-10 h-full min-h-0">
-            
-            {/* ステータス */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-3 rounded-xl shadow-xl shrink-0 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-              <h2 className="text-xs font-bold mb-2 text-slate-400 flex justify-between items-center">
-                <span className="bg-slate-800 px-3 py-1 rounded-full font-display tracking-wider">Turn {turn}/{MAX_TURNS}</span>
-                <span className={`px-3 py-1 rounded-full border text-[10px] tracking-wide ${economy === 'BOOM' ? 'bg-rose-500/20 border-rose-500/50 text-rose-300' : economy === 'RECESSION' ? 'bg-sky-500/20 border-sky-500/50 text-sky-300' : 'bg-slate-800 border-slate-600 text-slate-300'}`}>
-                  景気: {economy === 'BOOM' ? '好景気📈' : economy === 'RECESSION' ? '不景気📉' : '平常➖'}
-                </span>
-              </h2>
-              <div className="text-3xl font-display font-black text-white mb-1 tracking-tight">
-                ¥{totalAssets.toLocaleString()}
-              </div>
-              <div className="text-slate-400 text-xs font-medium flex items-center gap-2">
-                <span className="font-display">CASH:</span> ¥{cash.toLocaleString()}
-              </div>
+          {/* === PC用レイアウト (横並び・1画面収束) === */}
+          <div className="hidden md:flex h-screen w-full flex-row p-4 gap-3 relative overflow-hidden z-10">
+            {/* 左パネル */}
+            <div className="w-[35%] flex flex-col gap-3 h-full min-h-0">
+              {renderStatusPanel()}
+              {renderMarketPanel()}
+              {renderLogPanel(logContainerRefPC)}
             </div>
-
-            {/* マーケット */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-3 rounded-xl shadow-xl shrink-0">
-              <h2 className="text-[10px] font-display font-bold mb-2 text-slate-500 uppercase tracking-widest">Market</h2>
-              <div className="space-y-2">
-                {Object.keys(STOCKS).map(key => (
-                  <div key={key} className="p-2 border border-slate-700 bg-slate-800/50 rounded-lg transition-colors hover:bg-slate-800">
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="font-bold text-slate-200 text-xs">{STOCKS[key].icon} {STOCKS[key].name}</div>
-                      <div className="text-sm font-display font-bold text-white">¥{prices[key].toLocaleString()}</div>
-                    </div>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
-                      <div className="text-[11px] font-medium text-slate-400">
-                        保有: <span className={holdings[key] > 0 ? 'text-blue-400 font-display font-bold text-sm' : 'font-display text-sm'}>{holdings[key]}</span>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <button 
-                          onClick={() => handleTrade(key, false)}
-                          disabled={holdings[key] < 100 || gameState !== 'PLAYING'}
-                          className="px-3 py-1 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-md hover:bg-rose-500/20 disabled:opacity-30 transition-all text-xs font-bold"
-                        >
-                          売る
-                        </button>
-                        <button 
-                          onClick={() => handleTrade(key, true)}
-                          disabled={cash < prices[key] * 100 || gameState !== 'PLAYING'}
-                          className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-md hover:bg-blue-500/20 disabled:opacity-30 transition-all text-xs font-bold"
-                        >
-                          買う
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {/* 右パネル */}
+            <div className="w-[65%] flex flex-col gap-3 h-full min-h-0">
+              {renderBoardPanel()}
+              {renderDicePanel()}
             </div>
-
-            {/* ログエリア (ここで残りの高さをすべて吸収し、スクロールさせる) */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-3 rounded-xl shadow-xl flex-1 flex flex-col relative min-h-0">
-              <h2 className="text-[10px] font-display font-bold text-slate-500 uppercase tracking-widest mb-2 shrink-0">Event Log</h2>
-              <div 
-                ref={logContainerRef} 
-                className="overflow-y-auto flex-1 space-y-2 pr-2 text-xs leading-relaxed pb-4"
-              >
-                {logs.map((log, i) => (
-                  <div key={i} className={`border-l-[3px] pl-3 py-1.5 rounded-r-md ${
-                    log.type === 'good' ? 'border-emerald-500 text-emerald-100 bg-emerald-500/5' :
-                    log.type === 'bad' ? 'border-rose-500 text-rose-100 bg-rose-500/5' :
-                    log.type === 'trade' ? 'border-blue-500 text-blue-100 bg-blue-500/5' :
-                    'border-slate-500 text-slate-200 bg-slate-500/5'
-                  }`}>
-                    {log.turn > 0 && <span className="opacity-50 mr-1.5 text-[10px] font-display font-bold">[{log.turn}M]</span>}
-                    {log.msg}
-                  </div>
-                ))}
-              </div>
-              <div className="absolute bottom-2 left-3 right-4 h-6 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none rounded-b-xl"></div>
-            </div>
-
           </div>
 
-          {/* 右パネル (ボード・サイコロ) */}
-          <div className="w-full md:w-[65%] flex flex-col gap-3 z-10 h-full min-h-0">
-            
-            {/* カタン風ボード */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-3 md:p-4 rounded-xl shadow-xl flex-1 flex flex-col min-h-0">
-              <div className="flex justify-between items-center mb-2 shrink-0">
-                <h2 className="text-xs font-display font-bold text-slate-500 uppercase tracking-widest">World Board</h2>
-                <span className="text-[10px] md:text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full shadow-sm animate-pulse tracking-wide">
-                  💡 マスをクリックして経済を学ぼう
-                </span>
-              </div>
-
-              {/* ボードの表示領域。この中で比率を保ちながら最大化 */}
-              <div className="flex-1 w-full relative">
-                <div className="absolute inset-0 w-[95%] h-[95%] max-w-[800px] m-auto">
-                  {BOARD_SQUARES.map((sq, i) => {
-                    const style = getHexStyle(i, diceResult?.total);
-                    const isActive = diceResult?.total === sq.dice;
-                    return (
-                      <div 
-                        key={sq.id}
-                        style={style}
-                        onClick={() => setSelectedSquare(sq)}
-                        className={`cursor-pointer group flex items-center justify-center shadow-lg border-[1.5px] ${sq.color} hover:bg-opacity-40 backdrop-blur-md`}
-                      >
-                        {/* サイコロの目のトークン */}
-                        <div className={`absolute top-[12%] left-1/2 transform -translate-x-1/2 w-[22%] aspect-square rounded-full flex items-center justify-center font-display font-black text-[clamp(10px,1.5vw,14px)] shadow-md border z-10 ${sq.dice === 6 || sq.dice === 8 ? 'bg-red-50 text-red-600 border-red-300' : 'bg-slate-50 text-slate-800 border-slate-300'}`}>
-                          {sq.dice}
-                        </div>
-
-                        <div className="flex flex-col items-center justify-center h-full w-full pt-2 p-1 text-center pointer-events-none">
-                          <span className="text-2xl md:text-3xl drop-shadow-md mb-0.5">{sq.icon}</span>
-                          <span className="text-[8px] md:text-[10px] font-bold leading-tight drop-shadow-sm text-white px-0.5">
-                            {sq.label}
-                          </span>
-                        </div>
-
-                        {isActive && (
-                          <div 
-                            className="absolute inset-[-2px] border-[3px] border-white opacity-90 animate-ping pointer-events-none"
-                            style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
-                          ></div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* アクション（サイコロ） */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-4 rounded-xl shadow-xl shrink-0 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
-                <div className="flex gap-2">
-                  <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-800 border-2 border-slate-600 rounded-xl flex items-center justify-center text-2xl font-display font-black text-white shadow-inner">
-                    {diceResult ? diceResult.d1 : '?'}
-                  </div>
-                  <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-800 border-2 border-slate-600 rounded-xl flex items-center justify-center text-2xl font-display font-black text-white shadow-inner">
-                    {diceResult ? diceResult.d2 : '?'}
-                  </div>
-                </div>
-                <div className="text-xs text-slate-400 leading-relaxed hidden lg:block font-medium">
-                  株の売買が終わったら<br/>サイコロを振ってイベントを発生！
-                </div>
-              </div>
-              
-              <button 
-                onClick={rollDice}
-                disabled={gameState !== 'PLAYING'}
-                className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-display font-bold py-3 md:py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_30px_rgba(79,70,229,0.5)] transform transition hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-xl tracking-widest flex justify-center items-center gap-3"
-              >
-                <span className="text-2xl">🎲</span> ROLL
-              </button>
-            </div>
-
+          {/* === スマホ用レイアウト (縦並び・スクロール可能・順番最適化) === */}
+          <div className="flex md:hidden w-full flex-col p-3 gap-4 relative overflow-y-auto pb-10 z-10">
+            {renderStatusPanel()}
+            {renderBoardPanel()}
+            {renderDicePanel()}
+            {renderMarketPanel()}
+            {renderLogPanel(logContainerRefMobile)}
           </div>
 
-          {/* 学習モーダル */}
+          {/* 学習モーダル（盤面） */}
           {selectedSquare && (
             <div 
               className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
@@ -550,13 +578,46 @@
             </div>
           )}
 
+          {/* 学習モーダル（株の特徴） */}
+          {selectedStockKey && (
+            <div 
+              className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+              onClick={() => setSelectedStockKey(null)}
+            >
+              <div 
+                className="bg-slate-900 border border-slate-700 rounded-2xl p-6 md:p-8 max-w-sm w-full shadow-2xl animate-fade-in-up relative overflow-hidden" 
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-teal-400 to-emerald-500"></div>
+                
+                <div className="text-5xl text-center mb-4 drop-shadow-lg">
+                  {STOCKS[selectedStockKey].icon}
+                </div>
+                <h3 className="text-xl font-black text-center text-white mb-5 tracking-wide">{STOCKS[selectedStockKey].name}</h3>
+                
+                <div className="bg-slate-800/50 border border-slate-700 p-4 md:p-5 rounded-xl mb-6">
+                  <p className="text-slate-200 text-sm leading-relaxed font-medium">
+                    {STOCKS[selectedStockKey].desc}
+                  </p>
+                </div>
+                
+                <button 
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-lg transition-colors border border-slate-600 tracking-widest text-sm" 
+                  onClick={() => setSelectedStockKey(null)}
+                >
+                  閉じる
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ゲーム終了モーダル */}
           {gameState === 'END' && (
             <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 md:p-12 max-w-lg w-full text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-400 to-orange-500"></div>
                 
-                <h2 className="text-3xl md:text-4xl font-display font-black mb-3 text-white tracking-widest">GAME OVER</h2>
+                <h2 className="text-2xl md:text-3xl font-display font-black mb-3 text-white tracking-widest">INVESTMENT COMPLETE<br/><span className="text-xl">運用期間終了</span></h2>
                 <p className="text-slate-400 mb-8 font-medium text-sm md:text-base">2年（24ヶ月）の運用が完了しました。</p>
                 
                 <div className="bg-slate-800/50 border border-slate-700 p-6 md:p-8 rounded-2xl mb-8">
