@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Invest Quest - インベスト・クエスト</title>
 
-  <!-- Google Fonts: Montserrat (英語・数字用) & Noto Sans JP (日本語用) -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -25,81 +25,83 @@
     }
   </script>
 
-  <!-- React & ReactDOM (CDN) -->
+  <!-- React & ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  
-  <!-- Babel (ブラウザ内でJSXをコンパイル) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* カスタムスクロールバー */
-    ::-webkit-scrollbar {
-      width: 6px;
+    /* 全体のスクロールを無効化（1画面に収めるため） */
+    body {
+      overflow: hidden;
+      touch-action: none; /* スマホでのスワイプスクロール防止 */
     }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(71, 85, 105, 0.5); /* slate-600 with opacity */
-      border-radius: 10px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(100, 116, 139, 0.8); /* slate-500 */
-    }
+    
+    /* カスタムスクロールバー（内部のログ等用） */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.5); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.8); }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-sans antialiased overflow-x-hidden">
-  <div id="root"></div>
+<body class="bg-slate-950 text-slate-200 font-sans antialiased h-screen w-screen">
+  <div id="root" class="h-full w-full"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    // --- ゲームデータ定義 ---
     const INITIAL_CASH = 1000000;
     const MAX_TURNS = 24;
 
     const STOCKS = {
-      IT: { name: 'ITメガベンチャー', risk: 'high', basePrice: 1000, icon: '💻', desc: 'ハイリスク・ハイリターン。金利に敏感。' },
-      FOOD: { name: '安定食品メーカー', risk: 'low', basePrice: 1000, icon: '🍞', desc: 'ローリスク・ローリターン。景気に左右されにくい。' },
-      EXPORT: { name: 'グローバル自動車', risk: 'medium', basePrice: 1000, icon: '🚗', desc: 'ミドルリスク。円安で上がり、円高で下がる。' }
+      IT: { name: 'ITメガベンチャー', icon: '💻' },
+      FOOD: { name: '安定食品メーカー', icon: '🍞' },
+      EXPORT: { name: 'グローバル自動車', icon: '🚗' }
     };
 
+    // 19マスのイベント定義（期待値プラスに調整、7,2,12は1つ、他は2つ）
     const BOARD_SQUARES = [
-      { id: 0, type: 'START', label: 'スタート', icon: '🏁', color: 'bg-blue-500/20 border-blue-400 text-blue-100', explanation: '1ヶ月の始まりです。給料をもらって投資の資金にしましょう！手元の資金（キャッシュ）を増やすことが投資の第一歩です。' },
-      { id: 1, type: 'NEWS_MACRO_BOOM', label: '好景気', icon: '📈', color: 'bg-rose-500/20 border-rose-400 text-rose-100', explanation: '【マクロ経済】景気回復！モノがよく売れるようになり、企業の利益が増え、人々の給料も増えやすくなります。経済全体が活気づき、市場全体の株価が上がりやすくなります。' },
-      { id: 2, type: 'EVENT_IT_UP', label: 'IT 新サービス', icon: '🏢', color: 'bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-100', explanation: '【個別株要因】個別企業のポジティブなニュースは、その企業の株価を直接押し上げます。画期的なイノベーションはIT企業の大きな成長エンジンです。' },
-      { id: 3, type: 'NEWS_RATE_UP', label: '金利引上げ', icon: '🏦', color: 'bg-amber-500/20 border-amber-400 text-amber-100', explanation: '【マクロ経済】中央銀行が金利を上げると、銀行に預けるメリットが増える一方、企業はお金を借りにくくなります。将来の成長に期待して買われているIT株などは、成長スピードが落ちる懸念から特に下落しやすくなります。' },
-      { id: 4, type: 'SALARY', label: '臨時収入', icon: '💰', color: 'bg-emerald-500/20 border-emerald-400 text-emerald-100', explanation: '思わぬ臨時収入！投資に回すチャンスです。資金が増えれば、取れるリスクや選択肢も広がります。' },
-      { id: 5, type: 'EVENT_FOOD_DOWN', label: '食品 不祥事', icon: '📉', color: 'bg-slate-600/40 border-slate-400 text-slate-200', explanation: '【個別株要因】不祥事などのネガティブなニュースは、その企業の信用を落とし、株価急落の原因になります。これを『個別株リスク』と呼びます。' },
-      { id: 6, type: 'NEWS_FX_YEN_DOWN', label: '急激な円安', icon: '💴', color: 'bg-orange-500/20 border-orange-400 text-orange-100', explanation: '【為替】円安（例: 1ドル100円→150円）になると、海外で稼いだ外貨を日本円に直したときの金額が増えます。そのため、自動車などの輸出企業には大きなプラスとなり株価が上がりやすくなります。' },
-      { id: 7, type: 'EVENT_EXPORT_UP', label: '自動車 好調', icon: '🚗', color: 'bg-purple-500/20 border-purple-400 text-purple-100', explanation: '【個別株要因】製品の大ヒットは売上高の増加に直結します。業績が良くなるという期待から、投資家が株を買い求め株価が上がります。' },
-      { id: 8, type: 'NEWS_MACRO_RECESSION', label: '不景気', icon: '📉', color: 'bg-sky-500/20 border-sky-400 text-sky-100', explanation: '【マクロ経済】景気後退（リセッション）！人々の財布の紐が固くなり、モノが売れなくなります。企業の利益が減るため、市場全体の株価が下がりやすくなります。' },
-      { id: 9, type: 'EVENT_IT_DOWN', label: 'IT 情報漏洩', icon: '⚠️', color: 'bg-slate-600/40 border-slate-400 text-slate-200', explanation: '【個別株要因】情報漏洩などのトラブルは企業の致命傷になり得ます。このような急激な下落リスクを避けるために、複数の銘柄に分ける『分散投資』が重要です。' },
-      { id: 10, type: 'SALARY', label: 'ボーナス', icon: '💰', color: 'bg-emerald-500/20 border-emerald-400 text-emerald-100', explanation: 'ボーナス獲得！すべて現金で持っておくか、それとも株に変えてさらに増やすか。投資家の腕の見せ所です。' },
-      { id: 11, type: 'NEWS_RATE_DOWN', label: '金利引下げ', icon: '🏦', color: 'bg-amber-500/20 border-amber-400 text-amber-100', explanation: '【マクロ経済】金利引き下げ！企業が低い利息でお金を借りられるようになり、新規事業への投資が活発になります。株式市場にお金が流れやすくなり、成長期待の高いIT株などが上がりやすくなります。' },
-      { id: 12, type: 'EVENT_FOOD_UP', label: '食品 ヒット', icon: '🍞', color: 'bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-100', explanation: '【個別株要因】食品メーカーは不景気でも人々が毎日食べるため安定していますが、ヒット商品が出ればさらに株価が大きく上がる可能性があります。' },
-      { id: 13, type: 'NEWS_FX_YEN_UP', label: '急激な円高', icon: '💴', color: 'bg-indigo-500/20 border-indigo-400 text-indigo-100', explanation: '【為替】円高（例: 1ドル150円→100円）になると、輸出企業は海外で同じ値段で売っても、日本円に換算したときの利益が減ってしまいます。そのため輸出企業の株価にはマイナス要因です。' },
-      { id: 14, type: 'TAX', label: '税金支払い', icon: '💸', color: 'bg-red-500/20 border-red-500 text-red-200', explanation: '投資の利益や資産には税金がかかることがあります。支払いのために手元の現金（キャッシュ）をある程度確保しておく『流動性』の管理も大切です。' },
-      { id: 15, type: 'EVENT_ALL_RANDOM', label: '大統領選挙', icon: '🗳️', color: 'bg-teal-500/20 border-teal-400 text-teal-100', explanation: '【マクロ経済】政治の大きな変化（選挙など）は、市場全体を揺るがします。どのような政策が行われるかによって株価が乱高下するため、リスク管理が問われます。' },
+      { id: 0, dice: 7, type: 'NEWS_MACRO_BOOM', label: '好景気', icon: '📈', color: 'bg-rose-500/20 border-rose-400 text-rose-100', explanation: '出目7は一番確率が高い！景気回復により市場全体の株価が大きく上がりやすくなります。' },
+      { id: 1, dice: 2, type: 'TAX', label: '税金', icon: '💸', color: 'bg-red-500/20 border-red-500 text-red-200', explanation: '出目2は滅多に出ませんが、投資の利益や資産には税金がかかります。15万円を支払います。' },
+      { id: 2, dice: 12, type: 'SUPER_SALARY', label: '超ボーナス', icon: '💎', color: 'bg-yellow-500/20 border-yellow-400 text-yellow-100', explanation: '奇跡の出目12！なんと100万円の特別ボーナスを獲得します。一気に投資を加速させましょう。' },
+      { id: 3, dice: 3, type: 'EVENT_IT_DOWN', label: 'IT漏洩', icon: '⚠️', color: 'bg-slate-600/40 border-slate-400 text-slate-200', explanation: 'IT企業で情報漏洩！企業の致命傷になり、IT株が急落します。' },
+      { id: 4, dice: 3, type: 'EVENT_FOOD_DOWN', label: '食品不祥事', icon: '📉', color: 'bg-slate-600/40 border-slate-400 text-slate-200', explanation: '食品メーカーで不祥事。信用を落とし、食品株が下がります。' },
+      { id: 5, dice: 4, type: 'NEWS_MACRO_RECESSION', label: '不景気', icon: '📉', color: 'bg-sky-500/20 border-sky-400 text-sky-100', explanation: '景気後退！モノが売れなくなり、市場全体の株価が下がりやすくなります。' },
+      { id: 6, dice: 4, type: 'NEWS_FX_YEN_UP', label: '円高進行', icon: '💴', color: 'bg-indigo-500/20 border-indigo-400 text-indigo-100', explanation: '円高になると、海外で稼ぐ輸出企業の利益が減るため、自動車株が下がります。' },
+      { id: 7, dice: 5, type: 'NEWS_RATE_UP', label: '金利引上げ', icon: '🏦', color: 'bg-amber-500/20 border-amber-400 text-amber-100', explanation: '金利が上がると企業はお金を借りにくくなり、成長期待のIT株が下がります。' },
+      { id: 8, dice: 5, type: 'NEWS_FX_YEN_DOWN', label: '円安進行', icon: '💴', color: 'bg-orange-500/20 border-orange-400 text-orange-100', explanation: '円安になると、海外で稼いだ外貨が膨らむため、自動車株が上がります。' },
+      { id: 9, dice: 6, type: 'EVENT_IT_UP', label: 'IT新サ', icon: '🏢', color: 'bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-100', explanation: 'IT企業が画期的なサービスを発表！期待からIT株が急騰します。' },
+      { id: 10, dice: 6, type: 'EVENT_EXPORT_UP', label: '自動車好調', icon: '🚗', color: 'bg-purple-500/20 border-purple-400 text-purple-100', explanation: '自動車の売上が世界中で絶好調！自動車株が上がります。' },
+      { id: 11, dice: 8, type: 'EVENT_FOOD_UP', label: '食品ヒット', icon: '🍞', color: 'bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-100', explanation: '食品メーカーの新商品が大ヒット！食品株が上がります。' },
+      { id: 12, dice: 8, type: 'NEWS_RATE_DOWN', label: '金利引下げ', icon: '🏦', color: 'bg-amber-500/20 border-amber-400 text-amber-100', explanation: '金利が下がるとお金が借りやすくなり、成長期待のIT株などが上がります。' },
+      { id: 13, dice: 9, type: 'SALARY', label: '臨時収入', icon: '💰', color: 'bg-emerald-500/20 border-emerald-400 text-emerald-100', explanation: '思わぬ臨時収入！20万円を獲得します。投資のチャンスです。' },
+      { id: 14, dice: 9, type: 'SALARY', label: 'ボーナス', icon: '💰', color: 'bg-emerald-500/20 border-emerald-400 text-emerald-100', explanation: 'ボーナス獲得！20万円を獲得します。' },
+      { id: 15, dice: 10, type: 'SUBSIDY_IT', label: 'IT助成金', icon: '💻', color: 'bg-teal-500/20 border-teal-400 text-teal-100', explanation: '政府からのIT産業支援！10万円を獲得し、さらにIT株も上がります。' },
+      { id: 16, dice: 10, type: 'SUBSIDY_EXPORT', label: '輸出補助金', icon: '🚗', color: 'bg-teal-500/20 border-teal-400 text-teal-100', explanation: '政府からの輸出支援！10万円を獲得し、さらに自動車株も上がります。' },
+      { id: 17, dice: 11, type: 'EVENT_ALL_RANDOM', label: '選挙', icon: '🗳️', color: 'bg-indigo-500/20 border-indigo-400 text-indigo-100', explanation: '選挙により政治方針が変わり、市場が混乱して株価が乱高下します。' },
+      { id: 18, dice: 11, type: 'SUBSIDY_FOOD', label: '農業支援', icon: '🍞', color: 'bg-teal-500/20 border-teal-400 text-teal-100', explanation: '政府からの食品産業支援！10万円を獲得し、さらに食品株も上がります。' },
     ];
 
-    const HEX_ROUTE = [
-      {c:0, r:0}, {c:1, r:0}, {c:2, r:0}, {c:3, r:0}, {c:4, r:0},
-      {c:4, r:1}, {c:4, r:2}, {c:3, r:3}, {c:2, r:3}, {c:1, r:3},
-      {c:0, r:3}, {c:0, r:2}, {c:0, r:1}, {c:1, r:1}, {c:2, r:1},
-      {c:2, r:2}
+    // カタン風19マスの完全敷き詰め座標（3, 4, 5, 4, 3）
+    const HEX_GRID = [
+      {r: 0, c: 0, offset: 1}, {r: 0, c: 1, offset: 1}, {r: 0, c: 2, offset: 1},
+      {r: 1, c: 0, offset: 0.5}, {r: 1, c: 1, offset: 0.5}, {r: 1, c: 2, offset: 0.5}, {r: 1, c: 3, offset: 0.5},
+      {r: 2, c: 0, offset: 0}, {r: 2, c: 1, offset: 0}, {r: 2, c: 2, offset: 0}, {r: 2, c: 3, offset: 0}, {r: 2, c: 4, offset: 0},
+      {r: 3, c: 0, offset: 0.5}, {r: 3, c: 1, offset: 0.5}, {r: 3, c: 2, offset: 0.5}, {r: 3, c: 3, offset: 0.5},
+      {r: 4, c: 0, offset: 1}, {r: 4, c: 1, offset: 1}, {r: 4, c: 2, offset: 1},
     ];
 
-    const getHexStyle = (index, currentPos) => {
-      const { c, r } = HEX_ROUTE[index];
-      const w = 17; 
-      const h = w * 1.154; 
-      const leftOffset = 4;
-      const topOffset = 8;
-      const left = c * w + (r % 2 === 1 ? w / 2 : 0) + leftOffset;
-      const top = r * (h * 0.75) + topOffset;
-      const isActive = currentPos === index;
+    const getHexStyle = (index, currentDice) => {
+      const hex = HEX_GRID[index];
+      const sq = BOARD_SQUARES[index];
+      const w = 19; // パネルの幅(%)
+      const h = w * 1.154; // パネルの高さ(%)
+      const leftOffset = 2.5;
+      const topOffset = 2;
+      
+      const left = (hex.c + hex.offset) * w + leftOffset;
+      const top = hex.r * (h * 0.75) + topOffset;
+      const isActive = sq.dice === currentDice;
 
       return {
         position: 'absolute',
@@ -108,7 +110,7 @@
         width: `${w}%`,
         height: `${h}%`,
         clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-        transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
         zIndex: isActive ? 20 : 10,
         transform: isActive ? 'scale(1.15)' : 'scale(1)',
       };
@@ -120,7 +122,6 @@
       const [cash, setCash] = useState(INITIAL_CASH);
       const [holdings, setHoldings] = useState({ IT: 0, FOOD: 0, EXPORT: 0 });
       const [prices, setPrices] = useState({ IT: 1000, FOOD: 1000, EXPORT: 1000 });
-      const [position, setPosition] = useState(0);
       const [economy, setEconomy] = useState('NORMAL');
       const [logs, setLogs] = useState([{ turn: 0, msg: 'ゲームスタート！まずは株を買ってみましょう。', type: 'info' }]);
       const [diceResult, setDiceResult] = useState(null);
@@ -128,6 +129,7 @@
       
       const logContainerRef = useRef(null);
 
+      // ログが追加された時のみ、ログコンテナ内をスクロール
       useEffect(() => {
         if (logContainerRef.current) {
           logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
@@ -157,65 +159,40 @@
           if (cash >= cost) {
             setCash(prev => prev - cost);
             setHoldings(prev => ({ ...prev, [stockKey]: prev[stockKey] + amount }));
-            addLog(`${STOCKS[stockKey].name}を${amount}株買いました。（-${cost.toLocaleString()}円）`, 'trade');
+            addLog(`${STOCKS[stockKey].name}を${amount}株買いました（-${cost.toLocaleString()}円）`, 'trade');
           }
         } else {
           if (holdings[stockKey] >= amount) {
             setCash(prev => prev + cost);
             setHoldings(prev => ({ ...prev, [stockKey]: prev[stockKey] - amount }));
-            addLog(`${STOCKS[stockKey].name}を${amount}株売りました。（+${cost.toLocaleString()}円）`, 'trade');
+            addLog(`${STOCKS[stockKey].name}を${amount}株売りました（+${cost.toLocaleString()}円）`, 'trade');
           }
         }
       };
 
-      const rollDice = () => {
-        if (gameState !== 'PLAYING') return;
-
-        const d1 = Math.floor(Math.random() * 6) + 1;
-        const d2 = Math.floor(Math.random() * 6) + 1;
-        const total = d1 + d2;
-        setDiceResult({ d1, d2, total });
-
-        let newPos = (position + total) % BOARD_SQUARES.length;
-        setPosition(newPos);
-        
-        if (position + total >= BOARD_SQUARES.length) {
-          setCash(prev => prev + 200000);
-          addLog('🎯 スタート地点を通過！給料200,000円を獲得しました。', 'good');
-        }
-
-        addLog(`🎲 サイコロで「${d1}」と「${d2}」（合計：${total}）が出ました。`);
-        handleSquareEvent(newPos);
-        applyMarketFluctuation();
-
-        if (turn >= MAX_TURNS) {
-          setTimeout(() => setGameState('END'), 1500);
-          addLog('🏁 24ターンが終了しました！ゲームクリアです！', 'info');
-        } else {
-          setTurn(prev => prev + 1);
-        }
-      };
-
-      const handleSquareEvent = (posIndex) => {
-        const square = BOARD_SQUARES[posIndex];
-        addLog(`📍 【${square.label}】マスに止まりました。`, 'event');
-
+      const handleSquareEvent = (square) => {
         switch (square.type) {
+          case 'SUPER_SALARY':
+            setCash(prev => prev + 1000000);
+            addLog('💎 奇跡の出目12！特別ボーナス1,000,000円を獲得しました！', 'good');
+            break;
           case 'SALARY':
-            setCash(prev => prev + 300000);
-            addLog('💰 臨時収入！300,000円を獲得しました。', 'good');
+            setCash(prev => prev + 200000);
+            addLog(`💰 ${square.label}！200,000円を獲得しました。`, 'good');
             break;
           case 'TAX':
-            setCash(prev => prev - 150000);
+            setCash(prev => Math.max(0, prev - 150000));
             addLog('💸 税金の支払い！150,000円を支払いました。', 'bad');
             break;
           case 'NEWS_MACRO_BOOM':
             setEconomy('BOOM');
-            addLog('📈 景気回復の兆し！経済状態が「好景気」になりました。', 'good');
+            updatePrices({ IT: getMultiplier(1.05, 1.15), FOOD: getMultiplier(1.02, 1.1), EXPORT: getMultiplier(1.05, 1.15) });
+            addLog('📈 景気回復！経済状態が「好景気」になり、全体的に株価が上がりました。', 'good');
             break;
           case 'NEWS_MACRO_RECESSION':
             setEconomy('RECESSION');
-            addLog('📉 景気後退の懸念！経済状態が「不景気」になりました。', 'bad');
+            updatePrices({ IT: getMultiplier(0.85, 0.95), FOOD: getMultiplier(0.95, 0.99), EXPORT: getMultiplier(0.85, 0.95) });
+            addLog('📉 景気後退！経済状態が「不景気」になり、全体的に株価が下がりました。', 'bad');
             break;
           case 'NEWS_RATE_UP':
             updatePrices({ IT: getMultiplier(0.8, 0.9), FOOD: 1.0, EXPORT: 0.95 });
@@ -227,55 +204,91 @@
             break;
           case 'NEWS_FX_YEN_DOWN':
             updatePrices({ IT: 1.0, FOOD: 0.95, EXPORT: getMultiplier(1.1, 1.2) });
-            addLog('💴 円安進行！輸出企業の利益が増えるため、自動車株が上がりました。', 'good');
+            addLog('💴 円安進行！輸出企業の利益が増え、自動車株が上がりました。', 'good');
             break;
           case 'NEWS_FX_YEN_UP':
             updatePrices({ IT: 1.0, FOOD: 1.05, EXPORT: getMultiplier(0.8, 0.9) });
-            addLog('💴 円高進行！輸出企業の利益が目減りするため、自動車株が下がりました。', 'bad');
+            addLog('💴 円高進行！輸出企業の利益が目減りし、自動車株が下がりました。', 'bad');
             break;
           case 'EVENT_IT_UP':
-            updatePrices({ IT: getMultiplier(1.15, 1.3) });
-            addLog('🏢 IT企業が革新的なAIサービスを発表！IT株が急騰！', 'good');
+            updatePrices({ IT: getMultiplier(1.15, 1.35) });
+            addLog('🏢 IT企業が革新的な新サービスを発表！IT株が急騰！', 'good');
             break;
           case 'EVENT_IT_DOWN':
             updatePrices({ IT: getMultiplier(0.7, 0.85) });
-            addLog('⚠️ IT企業で大規模なシステム障害発生！IT株が急落しました。', 'bad');
+            addLog('⚠️ IT企業で情報漏洩！IT株が急落しました。', 'bad');
             break;
           case 'EVENT_FOOD_UP':
             updatePrices({ FOOD: getMultiplier(1.1, 1.2) });
-            addLog('🍞 食品メーカーの健康飲料が大ヒット！', 'good');
+            addLog('🍞 食品メーカーの新商品が大ヒット！', 'good');
             break;
           case 'EVENT_FOOD_DOWN':
             updatePrices({ FOOD: getMultiplier(0.85, 0.95) });
             addLog('📉 食品メーカーで不祥事。食品株が下がりました。', 'bad');
             break;
           case 'EVENT_EXPORT_UP':
-            updatePrices({ EXPORT: getMultiplier(1.1, 1.2) });
-            addLog('🚗 自動車メーカーの新型EVが世界中で大ヒット！', 'good');
+            updatePrices({ EXPORT: getMultiplier(1.15, 1.25) });
+            addLog('🚗 自動車メーカーの売上が世界中で絶好調！', 'good');
+            break;
+          case 'SUBSIDY_IT':
+            setCash(prev => prev + 100000);
+            updatePrices({ IT: getMultiplier(1.05, 1.1) });
+            addLog('💻 IT助成金！現金10万円を獲得し、IT株も上がりました。', 'good');
+            break;
+          case 'SUBSIDY_EXPORT':
+            setCash(prev => prev + 100000);
+            updatePrices({ EXPORT: getMultiplier(1.05, 1.1) });
+            addLog('🚗 輸出補助金！現金10万円を獲得し、自動車株も上がりました。', 'good');
+            break;
+          case 'SUBSIDY_FOOD':
+            setCash(prev => prev + 100000);
+            updatePrices({ FOOD: getMultiplier(1.05, 1.1) });
+            addLog('🍞 農業支援金！現金10万円を獲得し、食品株も上がりました。', 'good');
             break;
           case 'EVENT_ALL_RANDOM':
-            updatePrices({
-              IT: getMultiplier(0.8, 1.2),
-              FOOD: getMultiplier(0.9, 1.1),
-              EXPORT: getMultiplier(0.8, 1.2)
-            });
-            addLog('🗳️ 大統領選挙の結果発表！市場が混乱し株価が乱高下しました。', 'info');
+            updatePrices({ IT: getMultiplier(0.8, 1.2), FOOD: getMultiplier(0.9, 1.1), EXPORT: getMultiplier(0.8, 1.2) });
+            addLog('🗳️ 選挙による政権交代！市場が混乱し株価が乱高下しました。', 'info');
             break;
           default:
             break;
         }
       };
 
-      const applyMarketFluctuation = () => {
+      const rollDice = () => {
+        if (gameState !== 'PLAYING') return;
+
+        const d1 = Math.floor(Math.random() * 6) + 1;
+        const d2 = Math.floor(Math.random() * 6) + 1;
+        const total = d1 + d2;
+        setDiceResult({ d1, d2, total });
+
+        addLog(`🎲 サイコロで「${d1}」と「${d2}」（合計：${total}）が出ました！`);
+
+        // 合計値と一致するマスをすべて発動（2個ある目なら両方発動！）
+        const triggeredSquares = BOARD_SQUARES.filter(sq => sq.dice === total);
+        
+        if (triggeredSquares.length > 0) {
+          triggeredSquares.forEach(sq => {
+            handleSquareEvent(sq);
+          });
+        }
+
+        // 自然変動
         let baseTrend = 1.0;
         if (economy === 'BOOM') baseTrend = 1.02;
         if (economy === 'RECESSION') baseTrend = 0.98;
-
         updatePrices({
           IT: getMultiplier(baseTrend - 0.05, baseTrend + 0.05),
           FOOD: getMultiplier(baseTrend - 0.01, baseTrend + 0.01),
           EXPORT: getMultiplier(baseTrend - 0.03, baseTrend + 0.03)
         });
+
+        if (turn >= MAX_TURNS) {
+          setTimeout(() => setGameState('END'), 1500);
+          addLog('🏁 24ターンが終了しました！ゲームクリアです！', 'info');
+        } else {
+          setTurn(prev => prev + 1);
+        }
       };
 
       const resetGame = () => {
@@ -284,10 +297,9 @@
         setCash(INITIAL_CASH);
         setHoldings({ IT: 0, FOOD: 0, EXPORT: 0 });
         setPrices({ IT: 1000, FOOD: 1000, EXPORT: 1000 });
-        setPosition(0);
         setEconomy('NORMAL');
         setDiceResult(null);
-        setLogs([{ turn: 0, msg: 'ゲームスタート！まずは株を買ってみましょう。', type: 'info' }]);
+        setLogs([{ turn: 0, msg: 'ゲームスタート！株を買ってからサイコロを振りましょう。', type: 'info' }]);
       };
 
       const totalAssets = cash + 
@@ -305,21 +317,21 @@
 
       if (gameState === 'START') {
         return (
-          <div className="min-h-screen flex flex-col items-center justify-center p-4 relative">
+          <div className="h-full w-full flex flex-col items-center justify-center p-4 relative overflow-y-auto">
             <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/20 blur-[120px] pointer-events-none"></div>
             <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none"></div>
             
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 md:p-12 rounded-3xl shadow-2xl max-w-xl w-full text-center z-10">
-              <h1 className="text-5xl md:text-6xl font-display font-black mb-4 bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent drop-shadow-sm tracking-tight">
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 p-6 md:p-10 rounded-3xl shadow-2xl max-w-xl w-full text-center z-10">
+              <h1 className="text-4xl md:text-5xl font-display font-black mb-3 bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent drop-shadow-sm tracking-tight">
                 Invest Quest
               </h1>
-              <p className="mb-8 text-slate-400 font-medium tracking-wide">中学生から学べる！マクロ経済×投資ボードゲーム</p>
+              <p className="mb-6 text-slate-400 font-medium tracking-wide text-sm md:text-base">中学生から学べる！マクロ経済×投資ボードゲーム</p>
               
-              <div className="text-left bg-slate-800/50 border border-slate-700/50 p-6 rounded-2xl mb-10 text-sm leading-relaxed text-slate-300">
-                <h2 className="font-bold mb-4 text-white flex items-center gap-2"><span className="text-xl">📜</span> ルール説明</h2>
-                <ul className="space-y-3">
-                  <li className="flex gap-2"><span className="text-blue-400">■</span> 初期資金100万円を元手に、「IT」「食品」「自動車」の株を売買します。</li>
-                  <li className="flex gap-2"><span className="text-blue-400">■</span> さいころ（2つ）を振るとコマが進み、様々な経済ニュースが発生します。</li>
+              <div className="text-left bg-slate-800/50 border border-slate-700/50 p-5 rounded-2xl mb-8 text-sm leading-relaxed text-slate-300">
+                <h2 className="font-bold mb-3 text-white flex items-center gap-2"><span className="text-lg">📜</span> ルール説明</h2>
+                <ul className="space-y-2">
+                  <li className="flex gap-2"><span className="text-blue-400">■</span> 初期資金100万円で「IT」「食品」「自動車」の株を売買します。</li>
+                  <li className="flex gap-2"><span className="text-blue-400">■</span> さいころ（2つ）を振ると、**出た目と同じ数字が書かれたマスのイベントがすべて発生**します。</li>
                   <li className="flex gap-2"><span className="text-blue-400">■</span> マスをクリックすると、そのイベントの経済的な意味が学べます。</li>
                   <li className="flex gap-2"><span className="text-blue-400">■</span> 24ヶ月後の総資産額で、あなたの投資家ランクが決まります。</li>
                 </ul>
@@ -327,10 +339,10 @@
               
               <button 
                 onClick={resetGame}
-                className="group relative inline-flex items-center justify-center px-10 py-5 font-display font-bold text-white transition-all duration-200 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full hover:from-blue-400 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 overflow-hidden shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:-translate-y-1"
+                className="group relative inline-flex items-center justify-center px-8 py-4 font-display font-bold text-white transition-all duration-200 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full hover:from-blue-400 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 overflow-hidden shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)] hover:-translate-y-1"
               >
                 <span className="absolute inset-0 w-full h-full -mt-1 rounded-lg opacity-30 bg-gradient-to-b from-transparent via-transparent to-black"></span>
-                <span className="relative text-xl tracking-wider">GAME START</span>
+                <span className="relative text-lg tracking-wider">GAME START</span>
               </button>
             </div>
           </div>
@@ -338,57 +350,59 @@
       }
 
       return (
-        <div className="min-h-screen flex flex-col md:flex-row p-3 md:p-6 gap-6 relative">
+        <div className="h-full w-full flex flex-col md:flex-row p-2 md:p-4 gap-3 relative">
           
           <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none fixed">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/10 blur-[100px]"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-600/10 blur-[100px]"></div>
           </div>
 
-          {/* 左パネル */}
-          <div className="w-full md:w-1/3 flex flex-col gap-6 z-10">
+          {/* 左パネル (ステータス・売買・ログ) */}
+          <div className="w-full md:w-[35%] flex flex-col gap-3 z-10 h-full min-h-0">
             
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-5 rounded-2xl shadow-xl shrink-0 relative overflow-hidden">
+            {/* ステータス */}
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-3 rounded-xl shadow-xl shrink-0 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-              <h2 className="text-sm font-bold mb-3 text-slate-400 flex justify-between items-center">
-                <span className="bg-slate-800 px-4 py-1.5 rounded-full font-display tracking-wider">Turn {turn} / {MAX_TURNS}</span>
-                <span className={`px-4 py-1.5 rounded-full border text-xs tracking-wide ${economy === 'BOOM' ? 'bg-rose-500/20 border-rose-500/50 text-rose-300' : economy === 'RECESSION' ? 'bg-sky-500/20 border-sky-500/50 text-sky-300' : 'bg-slate-800 border-slate-600 text-slate-300'}`}>
-                  景気: {economy === 'BOOM' ? '好景気 📈' : economy === 'RECESSION' ? '不景気 📉' : '平常 ➖'}
+              <h2 className="text-xs font-bold mb-2 text-slate-400 flex justify-between items-center">
+                <span className="bg-slate-800 px-3 py-1 rounded-full font-display tracking-wider">Turn {turn}/{MAX_TURNS}</span>
+                <span className={`px-3 py-1 rounded-full border text-[10px] tracking-wide ${economy === 'BOOM' ? 'bg-rose-500/20 border-rose-500/50 text-rose-300' : economy === 'RECESSION' ? 'bg-sky-500/20 border-sky-500/50 text-sky-300' : 'bg-slate-800 border-slate-600 text-slate-300'}`}>
+                  景気: {economy === 'BOOM' ? '好景気📈' : economy === 'RECESSION' ? '不景気📉' : '平常➖'}
                 </span>
               </h2>
-              <div className="text-4xl md:text-5xl font-display font-black text-white mb-2 tracking-tight">
+              <div className="text-3xl font-display font-black text-white mb-1 tracking-tight">
                 ¥{totalAssets.toLocaleString()}
               </div>
-              <div className="text-slate-400 text-sm font-medium flex items-center gap-2">
+              <div className="text-slate-400 text-xs font-medium flex items-center gap-2">
                 <span className="font-display">CASH:</span> ¥{cash.toLocaleString()}
               </div>
             </div>
 
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-5 rounded-2xl shadow-xl shrink-0">
-              <h2 className="text-xs font-display font-bold mb-4 text-slate-500 uppercase tracking-widest">Market</h2>
-              <div className="space-y-4">
+            {/* マーケット */}
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-3 rounded-xl shadow-xl shrink-0">
+              <h2 className="text-[10px] font-display font-bold mb-2 text-slate-500 uppercase tracking-widest">Market</h2>
+              <div className="space-y-2">
                 {Object.keys(STOCKS).map(key => (
-                  <div key={key} className="p-4 border border-slate-700 bg-slate-800/50 rounded-xl transition-colors hover:bg-slate-800">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="font-bold text-slate-200 text-sm md:text-base">{STOCKS[key].icon} {STOCKS[key].name}</div>
-                      <div className="text-xl font-display font-bold text-white">¥{prices[key].toLocaleString()}</div>
+                  <div key={key} className="p-2 border border-slate-700 bg-slate-800/50 rounded-lg transition-colors hover:bg-slate-800">
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="font-bold text-slate-200 text-xs">{STOCKS[key].icon} {STOCKS[key].name}</div>
+                      <div className="text-sm font-display font-bold text-white">¥{prices[key].toLocaleString()}</div>
                     </div>
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-700/50">
-                      <div className="text-sm font-medium text-slate-400">
-                        保有: <span className={holdings[key] > 0 ? 'text-blue-400 font-display font-bold text-base' : 'font-display text-base'}>{holdings[key]}</span> 株
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
+                      <div className="text-[11px] font-medium text-slate-400">
+                        保有: <span className={holdings[key] > 0 ? 'text-blue-400 font-display font-bold text-sm' : 'font-display text-sm'}>{holdings[key]}</span>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5">
                         <button 
                           onClick={() => handleTrade(key, false)}
                           disabled={holdings[key] < 100 || gameState !== 'PLAYING'}
-                          className="px-5 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-lg hover:bg-rose-500/20 disabled:opacity-30 transition-all text-sm font-bold"
+                          className="px-3 py-1 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-md hover:bg-rose-500/20 disabled:opacity-30 transition-all text-xs font-bold"
                         >
                           売る
                         </button>
                         <button 
                           onClick={() => handleTrade(key, true)}
                           disabled={cash < prices[key] * 100 || gameState !== 'PLAYING'}
-                          className="px-5 py-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-lg hover:bg-blue-500/20 disabled:opacity-30 transition-all text-sm font-bold"
+                          className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-md hover:bg-blue-500/20 disabled:opacity-30 transition-all text-xs font-bold"
                         >
                           買う
                         </button>
@@ -399,46 +413,48 @@
               </div>
             </div>
 
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-5 rounded-2xl shadow-xl flex-1 flex flex-col relative min-h-[250px]">
-              <h2 className="text-xs font-display font-bold text-slate-500 uppercase tracking-widest mb-3 shrink-0">Event Log</h2>
+            {/* ログエリア (ここで残りの高さをすべて吸収し、スクロールさせる) */}
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-3 rounded-xl shadow-xl flex-1 flex flex-col relative min-h-0">
+              <h2 className="text-[10px] font-display font-bold text-slate-500 uppercase tracking-widest mb-2 shrink-0">Event Log</h2>
               <div 
                 ref={logContainerRef} 
-                className="overflow-y-auto flex-1 space-y-3 pr-2 text-sm leading-relaxed pb-4"
+                className="overflow-y-auto flex-1 space-y-2 pr-2 text-xs leading-relaxed pb-4"
               >
                 {logs.map((log, i) => (
-                  <div key={i} className={`border-l-[3px] pl-4 py-2 rounded-r-lg ${
+                  <div key={i} className={`border-l-[3px] pl-3 py-1.5 rounded-r-md ${
                     log.type === 'good' ? 'border-emerald-500 text-emerald-100 bg-emerald-500/5' :
                     log.type === 'bad' ? 'border-rose-500 text-rose-100 bg-rose-500/5' :
                     log.type === 'trade' ? 'border-blue-500 text-blue-100 bg-blue-500/5' :
-                    log.type === 'event' ? 'border-purple-500 text-purple-100 bg-purple-500/5' :
                     'border-slate-500 text-slate-200 bg-slate-500/5'
                   }`}>
-                    {log.turn > 0 && <span className="opacity-50 mr-2 text-xs font-display font-bold">[{log.turn}M]</span>}
+                    {log.turn > 0 && <span className="opacity-50 mr-1.5 text-[10px] font-display font-bold">[{log.turn}M]</span>}
                     {log.msg}
                   </div>
                 ))}
               </div>
-              <div className="absolute bottom-5 left-5 right-7 h-8 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none rounded-b-xl"></div>
+              <div className="absolute bottom-2 left-3 right-4 h-6 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none rounded-b-xl"></div>
             </div>
 
           </div>
 
-          {/* 右パネル */}
-          <div className="w-full md:w-2/3 flex flex-col gap-6 z-10">
+          {/* 右パネル (ボード・サイコロ) */}
+          <div className="w-full md:w-[65%] flex flex-col gap-3 z-10 h-full min-h-0">
             
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-5 md:p-8 rounded-2xl shadow-xl flex-1 flex flex-col min-h-[400px]">
-              <div className="flex justify-between items-center mb-6 shrink-0">
+            {/* カタン風ボード */}
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-3 md:p-4 rounded-xl shadow-xl flex-1 flex flex-col min-h-0">
+              <div className="flex justify-between items-center mb-2 shrink-0">
                 <h2 className="text-xs font-display font-bold text-slate-500 uppercase tracking-widest">World Board</h2>
-                <span className="text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-full shadow-sm animate-pulse tracking-wide">
+                <span className="text-[10px] md:text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full shadow-sm animate-pulse tracking-wide">
                   💡 マスをクリックして経済を学ぼう
                 </span>
               </div>
 
-              <div className="flex-1 flex items-center justify-center overflow-hidden py-4">
-                <div className="relative w-full max-w-[700px] aspect-[4/3]">
+              {/* ボードの表示領域。この中で比率を保ちながら最大化 */}
+              <div className="flex-1 w-full relative">
+                <div className="absolute inset-0 w-[95%] h-[95%] max-w-[800px] m-auto">
                   {BOARD_SQUARES.map((sq, i) => {
-                    const style = getHexStyle(i, position);
-                    const isActive = position === i;
+                    const style = getHexStyle(i, diceResult?.total);
+                    const isActive = diceResult?.total === sq.dice;
                     return (
                       <div 
                         key={sq.id}
@@ -446,16 +462,21 @@
                         onClick={() => setSelectedSquare(sq)}
                         className={`cursor-pointer group flex items-center justify-center shadow-lg border-[1.5px] ${sq.color} hover:bg-opacity-40 backdrop-blur-md`}
                       >
-                        <div className="flex flex-col items-center justify-center h-full w-full p-1 text-center pointer-events-none">
-                          <span className="text-3xl md:text-4xl drop-shadow-md mb-1">{sq.icon}</span>
-                          <span className="text-[10px] md:text-xs font-bold leading-tight drop-shadow-sm text-white px-1">
+                        {/* サイコロの目のトークン */}
+                        <div className={`absolute top-[12%] left-1/2 transform -translate-x-1/2 w-[22%] aspect-square rounded-full flex items-center justify-center font-display font-black text-[clamp(10px,1.5vw,14px)] shadow-md border z-10 ${sq.dice === 6 || sq.dice === 8 ? 'bg-red-50 text-red-600 border-red-300' : 'bg-slate-50 text-slate-800 border-slate-300'}`}>
+                          {sq.dice}
+                        </div>
+
+                        <div className="flex flex-col items-center justify-center h-full w-full pt-2 p-1 text-center pointer-events-none">
+                          <span className="text-2xl md:text-3xl drop-shadow-md mb-0.5">{sq.icon}</span>
+                          <span className="text-[8px] md:text-[10px] font-bold leading-tight drop-shadow-sm text-white px-0.5">
                             {sq.label}
                           </span>
                         </div>
 
                         {isActive && (
                           <div 
-                            className="absolute inset-[-2px] border-2 border-white opacity-80 animate-ping pointer-events-none"
+                            className="absolute inset-[-2px] border-[3px] border-white opacity-90 animate-ping pointer-events-none"
                             style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
                           ></div>
                         )}
@@ -466,27 +487,28 @@
               </div>
             </div>
 
-            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-5 md:p-8 rounded-2xl shadow-xl shrink-0 flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-6 w-full md:w-auto justify-center md:justify-start">
-                <div className="flex gap-4">
-                  <div className="w-16 h-16 bg-slate-800 border-2 border-slate-600 rounded-2xl flex items-center justify-center text-3xl font-display font-black text-white shadow-inner">
+            {/* アクション（サイコロ） */}
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/50 p-4 rounded-xl shadow-xl shrink-0 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
+                <div className="flex gap-2">
+                  <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-800 border-2 border-slate-600 rounded-xl flex items-center justify-center text-2xl font-display font-black text-white shadow-inner">
                     {diceResult ? diceResult.d1 : '?'}
                   </div>
-                  <div className="w-16 h-16 bg-slate-800 border-2 border-slate-600 rounded-2xl flex items-center justify-center text-3xl font-display font-black text-white shadow-inner">
+                  <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-800 border-2 border-slate-600 rounded-xl flex items-center justify-center text-2xl font-display font-black text-white shadow-inner">
                     {diceResult ? diceResult.d2 : '?'}
                   </div>
                 </div>
-                <div className="text-sm text-slate-400 leading-relaxed hidden lg:block font-medium">
-                  株の売買が終わったら<br/>サイコロを振って進みましょう。
+                <div className="text-xs text-slate-400 leading-relaxed hidden lg:block font-medium">
+                  株の売買が終わったら<br/>サイコロを振ってイベントを発生！
                 </div>
               </div>
               
               <button 
                 onClick={rollDice}
                 disabled={gameState !== 'PLAYING'}
-                className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-display font-bold py-5 px-12 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_30px_rgba(79,70,229,0.5)] transform transition hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-2xl tracking-widest flex justify-center items-center gap-4"
+                className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-display font-bold py-3 md:py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_30px_rgba(79,70,229,0.5)] transform transition hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-xl tracking-widest flex justify-center items-center gap-3"
               >
-                <span className="text-3xl">🎲</span> ROLL
+                <span className="text-2xl">🎲</span> ROLL
               </button>
             </div>
 
@@ -499,22 +521,27 @@
               onClick={() => setSelectedSquare(null)}
             >
               <div 
-                className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-md w-full shadow-2xl animate-fade-in-up relative overflow-hidden" 
+                className="bg-slate-900 border border-slate-700 rounded-2xl p-6 md:p-8 max-w-sm w-full shadow-2xl animate-fade-in-up relative overflow-hidden" 
                 onClick={e => e.stopPropagation()}
               >
-                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
                 
-                <div className="text-6xl text-center mb-6 drop-shadow-lg">{selectedSquare.icon}</div>
-                <h3 className="text-2xl font-black text-center text-white mb-6 tracking-wide">{selectedSquare.label}</h3>
+                <div className="text-5xl text-center mb-4 drop-shadow-lg relative">
+                  {selectedSquare.icon}
+                  <span className="absolute -top-2 right-1/4 bg-slate-800 border border-slate-600 text-white text-xs font-display font-bold px-2 py-0.5 rounded-full">
+                    出目: {selectedSquare.dice}
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-center text-white mb-5 tracking-wide">{selectedSquare.label}</h3>
                 
-                <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl mb-8">
-                  <p className="text-slate-200 text-sm md:text-base leading-relaxed font-medium">
+                <div className="bg-slate-800/50 border border-slate-700 p-4 md:p-5 rounded-xl mb-6">
+                  <p className="text-slate-200 text-sm leading-relaxed font-medium">
                     {selectedSquare.explanation}
                   </p>
                 </div>
                 
                 <button 
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 rounded-xl transition-colors border border-slate-600 tracking-widest" 
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-lg transition-colors border border-slate-600 tracking-widest text-sm" 
                   onClick={() => setSelectedSquare(null)}
                 >
                   閉じる
@@ -526,27 +553,27 @@
           {/* ゲーム終了モーダル */}
           {gameState === 'END' && (
             <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
-              <div className="bg-slate-900 border border-slate-700 rounded-3xl p-10 md:p-12 max-w-lg w-full text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
+              <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 md:p-12 max-w-lg w-full text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-400 to-orange-500"></div>
                 
-                <h2 className="text-4xl font-display font-black mb-3 text-white tracking-widest">GAME OVER</h2>
-                <p className="text-slate-400 mb-10 font-medium">2年（24ヶ月）の運用が完了しました。</p>
+                <h2 className="text-3xl md:text-4xl font-display font-black mb-3 text-white tracking-widest">GAME OVER</h2>
+                <p className="text-slate-400 mb-8 font-medium text-sm md:text-base">2年（24ヶ月）の運用が完了しました。</p>
                 
-                <div className="bg-slate-800/50 border border-slate-700 p-8 rounded-2xl mb-10">
-                  <p className="text-sm font-display text-slate-500 mb-3 uppercase tracking-widest font-bold">Final Assets</p>
-                  <p className="text-5xl md:text-6xl font-display font-black text-white tracking-tighter">¥{totalAssets.toLocaleString()}</p>
+                <div className="bg-slate-800/50 border border-slate-700 p-6 md:p-8 rounded-2xl mb-8">
+                  <p className="text-xs font-display text-slate-500 mb-2 uppercase tracking-widest font-bold">Final Assets</p>
+                  <p className="text-4xl md:text-5xl font-display font-black text-white tracking-tighter">¥{totalAssets.toLocaleString()}</p>
                 </div>
 
-                <div className="mb-12">
-                  <p className="text-sm font-display text-slate-500 mb-3 uppercase tracking-widest font-bold">Your Rank</p>
-                  <p className={`text-3xl font-black ${getRank(totalAssets).color} tracking-wide`}>
+                <div className="mb-10">
+                  <p className="text-xs font-display text-slate-500 mb-2 uppercase tracking-widest font-bold">Your Rank</p>
+                  <p className={`text-2xl md:text-3xl font-black ${getRank(totalAssets).color} tracking-wide`}>
                     {getRank(totalAssets).title}
                   </p>
                 </div>
 
                 <button 
                   onClick={resetGame}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-display font-bold py-5 rounded-2xl shadow-lg transition-all tracking-widest text-xl hover:-translate-y-1"
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-display font-bold py-4 rounded-xl shadow-lg transition-all tracking-widest text-lg hover:-translate-y-1"
                 >
                   PLAY AGAIN
                 </button>
